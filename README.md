@@ -12,12 +12,9 @@ make
 
 # run
 glslppm
-
 load and render cornell_metal.obj
 
-
 glslppm file.obj
-
 load and render file.obj
 
 <img src="http://moo.ho.ua/glslsppm.jpg">

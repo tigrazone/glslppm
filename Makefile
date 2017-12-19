@@ -1,0 +1,4 @@
+all:
+	g++ -mwindows -DWIN32  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -o glslppm glee.c glslppm.cpp gpurt.cpp bbox.cpp bvh.cpp camera.cpp mesh.cpp  -march=native -funroll-loops -mfpmath=sse -msse2 -msse3 -mssse3 -ffast-math  -O2 -Wall -Wunused -Wno-format-y2k  -fno-exceptions -fno-strict-aliasing -s -fopenmp -mconsole -static  -static-libgcc -static-libstdc++  -lopengl32 -lglu32 -lglut32 -lgdi32  
+dbg:
+	g++ -mwindows -DWIN32  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -o 'smallmmlt-dbg' smallmmlt.cpp  -march=native -funroll-loops -mfpmath=sse -msse2 -msse3 -mssse3 -ffast-math  -O2 -Wall -Wunused -Wno-format-y2k  -fno-exceptions -fno-strict-aliasing  -g -fopenmp -mconsole   -static  -static-libgcc -static-libstdc++

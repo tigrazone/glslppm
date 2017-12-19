@@ -73,7 +73,11 @@ void LoadMTL(const std::string fileName)
 			mtl.name = lineStr;
 			mtl.isTextured = false;
 		}
-		else if (lineStr.compare(0, 2, "Ka", 0, 2) == 0)
+		else if (
+		lineStr.compare(0, 2, "Ka", 0, 2) == 0
+		||
+		lineStr.compare(0, 2, "Ke", 0, 2) == 0  //Ke - emission of light
+		)
 		{
 			lineStr.erase(0, 3);
 			sscanf(lineStr.c_str(), "%f %f %f\n", &r, &g, &b);

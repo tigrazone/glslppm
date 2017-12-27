@@ -55,8 +55,12 @@ void LoadPPM(const char *fname, const int i)
 
 void LoadMTL(const std::string fileName)
 {
+	printf("LoadMTL(%s)...\n", fileName.c_str());
+	
 	FILE * fp = fopen(fileName.c_str(),"r");
 
+	int lines=0;
+	
 	TMaterial mtl;
 	mtl.texture.clear();
 	char line[81];
@@ -66,6 +70,8 @@ void LoadMTL(const std::string fileName)
 		std::string lineStr;
 		lineStr = line;
 		int i = mtls.size();
+		
+		lines++;
 
 		if (lineStr.compare(0, 6, "newmtl", 0, 6) == 0)
 		{
@@ -81,12 +87,15 @@ void LoadMTL(const std::string fileName)
 		{
 			lineStr.erase(0, 3);
 			sscanf(lineStr.c_str(), "%f %f %f\n", &r, &g, &b);
+			//printf("Ka/ke %f %f %f\n", r,g,b);
 			mtl.Ka = TVector3(r, g, b);
 		}
 		else if (lineStr.compare(0, 2, "Kd", 0, 2) == 0)
 		{
 			lineStr.erase(0, 3);
 			sscanf(lineStr.c_str(), "%f %f %f\n", &r, &g, &b);
+			//printf("KD %f %f %f\n", r,g,b);
+			
 			mtl.Kd = TVector3(r, g, b);
 		}
 		else if (lineStr.compare(0, 2, "Ks", 0, 2) == 0)
@@ -94,12 +103,14 @@ void LoadMTL(const std::string fileName)
 			lineStr.erase(0, 3);
 			sscanf(lineStr.c_str(), "%f %f %f\n", &r, &g, &b);
 			mtl.Ks = TVector3(r, g, b);
+			//printf("Ks %f %f %f\n", r,g,b);
 		}
 		else if (lineStr.compare(0, 2, "Ns", 0, 2) == 0)
 		{
 			lineStr.erase(0, 3);
 			sscanf(lineStr.c_str(), "%f\n", &s);
 			mtl.Ns = s;
+			//printf("Ns %f\n", s);
 			mtls.push_back(mtl);
 			mtls[i].texture.clear();
 		}
@@ -113,6 +124,9 @@ void LoadMTL(const std::string fileName)
 	}
 
 	fclose(fp);
+	
+	printf("lines=%d mats=%ld\n", lines, mtls.size());
+	printf("LoadMTL(%s) done\n", fileName.c_str());
 }
 
 
@@ -408,6 +422,8 @@ void ParseOBJ(char* fileName, int &nVertices, float **vertices, float **normals,
 	delete[] vInd;
 	delete[] tInd;
 	delete[] mInd;
+	
+	printf("* %d tris\n", ntriangles);
 }
 
 
@@ -455,6 +471,8 @@ void TMesh::PrepareLightSources()
 			this->lightsArea += a;
 		}
 	}
+	
+	printf("LIGHTS: %ld\n", this->lightsCDF.size());
 
 	if (this->lightsCDF.size() == 0) return;
 
@@ -506,17 +524,25 @@ void TMesh::LoadOBJ(char* FileName, TVector3 Position, float Scale)
 			this->materials[i].eta = 1.7f;
 			this->materials[i].specularity = 1.0f;
 
+			printf("*mat %s\n", mtls[i].name.c_str());
+			printf("Ns=%.2f\n", mtls[i].Ns);
+			printf("Ka=%.2f, %.2f, %.2f\n", mtls[i].Ka.x, mtls[i].Ka.y, mtls[i].Ka.z);
+			printf("Kd=%.2f, %.2f, %.2f\n", mtls[i].Kd.x, mtls[i].Kd.y, mtls[i].Kd.z);
+			printf("Ks=%.2f, %.2f, %.2f\n", mtls[i].Ks.x, mtls[i].Ks.y, mtls[i].Ks.z);
+			
 			if (mtls[i].Ns == 100.0f)
 			{
 				if (mtls[i].Ks.dot(mtls[i].Ks) == 3.0f)
 				{
 					// mirror
 					this->materials[i].brdf = 1;
+					printf("mirror\n");
 				}
 				else if (mtls[i].Ks.dot(mtls[i].Ks) > 0.0f)
 				{
 					// plastic
 					this->materials[i].brdf = 3;
+					printf("plastic\n");
 				}
 			}
 			else
@@ -526,11 +552,13 @@ void TMesh::LoadOBJ(char* FileName, TVector3 Position, float Scale)
 				{
 					// glossy mirror
 					this->materials[i].brdf = 4;
+					printf("glossy mirror\n");
 				}
 				else if (mtls[i].Ks.dot(mtls[i].Ks) > 0.0f)
 				{
 					// glossy plastic
 					this->materials[i].brdf = 6;
+					printf("glossy plastic\n");
 				}
 			}
 
@@ -541,12 +569,14 @@ void TMesh::LoadOBJ(char* FileName, TVector3 Position, float Scale)
 				{
 					// glass
 					this->materials[i].brdf = 2;
+					printf("glass\n");
 				}
 				else 
 				{
 					// glossy glass
 					this->materials[i].specularity = std::max(mtls[i].Ns / 100.0f, 0.5f);
 					this->materials[i].brdf = 5;
+					printf("glossy glass\n");
 				}
 			}
 
@@ -555,6 +585,7 @@ void TMesh::LoadOBJ(char* FileName, TVector3 Position, float Scale)
 				// light source
 				this->materials[i].brdf = -1;
 				haveLightSource = true;
+				//printf("light source\n");
 			}
 
 			if ((this->materials[i].brdf == 0) || (this->materials[i].brdf == 3))
@@ -575,6 +606,8 @@ void TMesh::LoadOBJ(char* FileName, TVector3 Position, float Scale)
 			{
 				this->materials[i].brdf = 7;
 			}
+			
+			printf("this->materials[i].brdf=%d\n", this->materials[i].brdf);
 		}
 	}
 	else
@@ -647,6 +680,9 @@ void TMesh::LoadOBJ(char* FileName, TVector3 Position, float Scale)
 	}
 
 	this->CalculateBBox();
+	
+	printf("haveLightSource=%d\n", haveLightSource);
+	
 	if (haveLightSource) this->PrepareLightSources();
 
 	delete[] vertices;

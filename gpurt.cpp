@@ -122,7 +122,8 @@ void CGPURT::CreateTextures()
 			k++;
 
 			MaterialTexSys[k].x = (float)this->mesh.materials[i].brdf;
-			MaterialTexSys[k].y = this->mesh.materials[i].specularity;
+			//MaterialTexSys[k].y = pow(2.0f / (1.0f - this->mesh.materials[i].specularity), 2.71828f);	//pow(2.0 / (1.0 - i.g), 2.71828)
+			MaterialTexSys[k].y = 1.0f / (pow(2.0f / (1.0f - this->mesh.materials[i].specularity), 2.71828f) + 1.0f);	//1.0 / (g + 1.0)
 			MaterialTexSys[k].z = 0.0f;
 			MaterialTexSys[k].w = 0.0f;
 			k++;
@@ -553,6 +554,8 @@ void CGPURT::CreateTextures()
 
 void CGPURT::BuildBVH()
 {
+	printf(" %ld tris ", (long) this->mesh.triangles.size());
+	
 	this->bvh.Build(this->mesh);
 }
 

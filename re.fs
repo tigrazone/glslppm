@@ -15,7 +15,8 @@ float sRGB(const float c)
 	else
 	{
 		const float a = 0.055;
-		return (1.0 + a) * pow(c, 1.0 / 2.4) - a;
+		//return (1.0 + a) * pow(c, 1.0 / 2.4) - a;
+		return (1.0 + a) * pow(c, 0.416666666667) - a;
 	}
 }
 

@@ -145,6 +145,98 @@ Intersection raytrace(const Ray ray, const bool cullBackface)
 					isect = vec4(TriangleStartIndex, MaterialIndex, uvt.z);
 				}
 			}
+			
+			/*
+			
+    // Calculate dimension where the ray direction is maximal.
+    ray_coeff_.kz = 0;
+    T absDir = std::fabs(ray.dir[0]);
+    if (absDir < std::fabs(ray.dir[1])) {
+      ray_coeff_.kz = 1;
+      absDir = std::fabs(ray.dir[1]);
+    }
+    if (absDir < std::fabs(ray.dir[2])) {
+      ray_coeff_.kz = 2;
+      absDir = std::fabs(ray.dir[2]);
+    }
+
+    ray_coeff_.kx = ray_coeff_.kz + 1;
+    if (ray_coeff_.kx == 3) ray_coeff_.kx = 0;
+    ray_coeff_.ky = ray_coeff_.kx + 1;
+    if (ray_coeff_.ky == 3) ray_coeff_.ky = 0;
+
+    // Swap kx and ky dimention to preserve widing direction of triangles.
+    if (ray.dir[ray_coeff_.kz] < 0.0f) std::swap(ray_coeff_.kx, ray_coeff_.ky);
+
+    // Claculate shear constants.
+    ray_coeff_.Sz = 1.0f / ray.dir[ray_coeff_.kz];
+    ray_coeff_.Sx = ray.dir[ray_coeff_.kx] * ray_coeff_.Sz;
+    ray_coeff_.Sy = ray.dir[ray_coeff_.ky] * ray_coeff_.Sz;
+	
+	
+	const unsigned int f0 = faces_[3 * prim_index + 0];
+    const unsigned int f1 = faces_[3 * prim_index + 1];
+    const unsigned int f2 = faces_[3 * prim_index + 2];
+
+    const real3<T> p0(get_vertex_addr(vertices_, f0 + 0, vertex_stride_bytes_));
+    const real3<T> p1(get_vertex_addr(vertices_, f1 + 0, vertex_stride_bytes_));
+    const real3<T> p2(get_vertex_addr(vertices_, f2 + 0, vertex_stride_bytes_));
+
+    const real3<T> A = p0 - ray_org_;
+    const real3<T> B = p1 - ray_org_;
+    const real3<T> C = p2 - ray_org_;
+
+    const T Ax = A[ray_coeff_.kx] - ray_coeff_.Sx * A[ray_coeff_.kz];
+    const T Ay = A[ray_coeff_.ky] - ray_coeff_.Sy * A[ray_coeff_.kz];
+    const T Bx = B[ray_coeff_.kx] - ray_coeff_.Sx * B[ray_coeff_.kz];
+    const T By = B[ray_coeff_.ky] - ray_coeff_.Sy * B[ray_coeff_.kz];
+    const T Cx = C[ray_coeff_.kx] - ray_coeff_.Sx * C[ray_coeff_.kz];
+    const T Cy = C[ray_coeff_.ky] - ray_coeff_.Sy * C[ray_coeff_.kz];
+	//6*
+
+    T U = Cx * By - Cy * Bx;
+    T V = Ax * Cy - Ay * Cx;
+    T W = Bx * Ay - By * Ax;
+	//6*
+	
+	//12*
+
+    if (trace_options_.cull_back_face) {
+      if (U < 0.0 || V < 0.0 || W < 0.0) return false;
+    } else {
+      if ((U < 0.0 || V < 0.0 || W < 0.0) && (U > 0.0 || V > 0.0 || W > 0.0)) {
+        return false;
+      }
+    }
+
+    T det = U + V + W;
+    if (det == 0.0) return false;
+
+    const T Az = ray_coeff_.Sz * A[ray_coeff_.kz];
+    const T Bz = ray_coeff_.Sz * B[ray_coeff_.kz];
+    const T Cz = ray_coeff_.Sz * C[ray_coeff_.kz];
+    const T D = U * Az + V * Bz + W * Cz;
+	//6*
+	//18*
+
+    const T rcpDet = 1.0 / det;
+    T tt = D * rcpDet;
+
+    if (tt > (*t_inout)) {
+      return false;
+    }
+
+    (*t_inout) = tt;
+    // Use Thomas-Mueller style barycentric coord.
+    // U + V + W = 1.0 and interp(p) = U * p0 + V * p1 + W * p2
+    // We want interp(p) = (1 - u - v) * p0 + u * v1 + v * p2;
+    // => u = V, v = W.
+    intersection.u = V * rcpDet;
+    intersection.v = W * rcpDet;
+	//20*
+
+    return true;
+*/
 		}
 
 		if (BBHit)
@@ -205,8 +297,19 @@ vec3 onb(const vec3 x, const vec3 n)
 	 
 	if (n.z < -0.9999999)
 	{
-		u = vec3(0.0, -1.0, 0.0); 
-		w = vec3(-1.0, 0.0, 0.0);
+		//u = vec3(0.0, -1.0, 0.0); 
+		//w = vec3(-1.0, 0.0, 0.0);
+		//return (x.x * u + x.y * v + x.z * w);
+		//x.x*(0,-1,0) + x.y*v + x.z*(-1,0,0)
+		//(0,-x.x,0) + x.y*v + (-x.z,0,0)
+		//x.y*v + (0,-x.x,0) + (-x.z,0,0)
+		//x.y*v - (x.z,x.x,0)
+		
+		//return x.y*v - vec3(x.z,x.x,0); //-2x3*  -6*
+		
+		u = vec3(x.z, x.x, 0.0);
+		
+		return x.y*v - u; //-2x3*  -6*
 	}
 	else
 	{
@@ -214,13 +317,10 @@ vec3 onb(const vec3 x, const vec3 n)
 		float b = -n.x * n.y * a;
 		u = vec3(1.0 - n.x * n.x * a, b, -n.x); 
 		w = vec3(b, 1.0 - n.y * n.y * a, -n.y);
+		return (x.x * u + x.y * v + x.z * w);
 	}
-	return (x.x * u + x.y * v + x.z * w);
 }
 
-
-float GPURnd(inout vec4 n)
-{
 	// Based on the post http://gpgpu.org/forums/viewtopic.php?t=2591&sid=17051481b9f78fb49fba5b98a5e0f1f3
 	// (The page no longer exists as of March 17th, 2015. Please let me know if you see why this code works.)
 	const vec4 q = vec4(   1225.0,    1585.0,    2457.0,    2098.0);
@@ -228,12 +328,22 @@ float GPURnd(inout vec4 n)
 	const vec4 a = vec4(   3423.0,    2646.0,    1707.0,    1999.0);
 	const vec4 m = vec4(4194287.0, 4194277.0, 4194191.0, 4194167.0);
 
-	vec4 beta = floor(n / q);
+	const vec4 m_2 = vec4(0.5) * m;
+	const vec4 m_ = vec4(1) / m;
+	
+	const vec4 q_ = vec4(1) / q;
+
+
+float GPURnd(inout vec4 n)
+{	
+	vec4 beta = floor(n * q_);
 	vec4 p = a * (n - beta * q) - beta * r;
-	beta = (sign(-p) + vec4(1.0)) * vec4(0.5) * m;
+	
+	beta = (sign(-p)) * m_2 + m_2;
+	
 	n = (p + beta);
 
-	return fract(dot(n / m, vec4(1.0, -1.0, 1.0, -1.0)));
+	return fract(dot(n * m_, vec4(1.0, -1.0, 1.0, -1.0)));
 }
 
 
@@ -259,15 +369,18 @@ float Fresnel(in vec3 incom, in vec3 normal, in float index_internal, in float i
 
 vec3 glossy_reflect(const vec3 d, const vec3 n, const float g, inout vec4 rndv)
 {
-	float a = 2.0 / (g + 1.0);
-	vec3 r = normalize((1.0 - a) * reflect(d, n) + a * n);
+	vec3 r = normalize((1.0 - g - g) * reflect(d, n) + (g + g) * n);
 
 	float rnd1 = GPURnd(rndv);
 	float rnd2 = GPURnd(rndv);
 
-	float temp1 = 2.0 * 3.141592 * rnd1;
-	float temp2 = sqrt(1.0 - pow(rnd2, 2.0 / (g + 1.0)));
-	vec3 v = vec3(sin(temp1) * temp2, pow(rnd2, 1.0 / (g + 1.0)), cos(temp1) * temp2);
+	//float temp1 = 2.0 * 3.141592 * rnd1;
+	float temp1 = 6.283184 * rnd1;
+	//float temp2 = sqrt(1.0 - pow(rnd2, 2.0 / (g + 1.0)));
+	
+	float temp2_ = pow(rnd2, g);
+	float temp2 = sqrt(1.0 - temp2_*temp2_);
+	vec3 v = vec3(sin(temp1) * temp2, temp2_, cos(temp1) * temp2);
 
 	vec3 result = normalize(onb(v, r));
 	if (dot(result, n) < 0.0)
@@ -301,7 +414,7 @@ void main()
 		// thin-lens
 		vec3 fp = CameraPosition + r.dir * FocalLength;
 		float radius = sqrt(GPURnd(rndv)) * ApertureSize;
-		float theta = 2.0 * 3.141592 * GPURnd(rndv);
+		float theta = 6.283184 * GPURnd(rndv);
 		vec3 lens = CameraPosition + radius * (CameraU * cos(theta) + CameraV * sin(theta));
 		r.dir = normalize(fp - lens);
 		r.org = lens;
@@ -346,7 +459,11 @@ void main()
 		else if ((i.brdf == 1) || (i.brdf == 4))
 		{
 			r.org = pos + eps * i.gnrm;
-			if (i.brdf == 4) nrm = glossy_reflect(nrm, nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			
+			//if (i.brdf == 4) nrm = glossy_reflect(nrm, nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//tigra: 1/ 1* => 1/
+			//if (i.brdf == 4) nrm = glossy_reflect(nrm, nrm, pow(2.0 / (1.0 - i.g), 2.71828), rndv);
+			if (i.brdf == 4) nrm = glossy_reflect(nrm, nrm, i.g, rndv);
 			r.dir = reflect(r.dir, nrm);
 
 			if (dot(r.dir, i.gnrm) < 0.0) r.dir = -r.dir;
@@ -354,7 +471,9 @@ void main()
 		}
 		else if ((i.brdf == 2) || (i.brdf == 5))
 		{
-			if (i.brdf == 5) nrm = glossy_reflect(nrm, nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 5) nrm = glossy_reflect(nrm, nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 5) nrm = glossy_reflect(nrm, nrm, pow(2.0 / (1.0 - i.g), 2.71828), rndv);
+			if (i.brdf == 5) nrm = glossy_reflect(nrm, nrm, i.g, rndv);
 
 			// specular refraction
 			float ln = dot(nrm, r.dir);
@@ -398,7 +517,9 @@ void main()
 		}
 		else if ((i.brdf == 3) || (i.brdf == 6))
 		{
-			if (i.brdf == 6) nrm = glossy_reflect(nrm, nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 6) nrm = glossy_reflect(nrm, nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 6) nrm = glossy_reflect(nrm, nrm, pow(2.0 / (1.0 - i.g), 2.71828), rndv);
+			if (i.brdf == 6) nrm = glossy_reflect(nrm, nrm, i.g, rndv);
 
 			// specular reflection
 			float ln = -abs(dot(nrm, r.dir));

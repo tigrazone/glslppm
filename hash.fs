@@ -6,6 +6,7 @@ uniform sampler2D PhotonFluxTexture;
 
 uniform int HashNum;
 uniform float GridScale; 
+uniform float HashScale1; 
 uniform vec3 BBoxMin;
 
 uniform vec4 BufInfo;
@@ -17,22 +18,33 @@ vec2 convert1Dto2D(const float t)
 }
 
 
-float hash(const vec3 idx)
-{
-	// use the same procedure as GPURnd
-	vec4 n = vec4(idx, GridScale * 0.5) * 4194304.0 / GridScale;
-
 	const vec4 q = vec4(   1225.0,    1585.0,    2457.0,    2098.0);
 	const vec4 r = vec4(   1112.0,     367.0,      92.0,     265.0);
 	const vec4 a = vec4(   3423.0,    2646.0,    1707.0,    1999.0);
 	const vec4 m = vec4(4194287.0, 4194277.0, 4194191.0, 4194167.0);
 
-	vec4 beta = floor(n / q);
-	vec4 p = a * (n - beta * q) - beta * r;
-	beta = (sign(-p) + vec4(1.0)) * vec4(0.5) * m;
-	n = (p + beta);
+	const vec4 m_2 = vec4(0.5) * m;
+	const vec4 m_ = vec4(1) / m;
+	
+	const vec4 q_ = vec4(1) / q;
 
-	return floor(fract(dot(n / m, vec4(1.0, -1.0, 1.0, -1.0))) * HashNum);
+
+float hash(const vec3 idx)
+{
+	// use the same procedure as GPURnd
+	
+	//vec4 n = vec4(idx, GridScale * 0.5) * 4194304.0 / GridScale;
+	vec4 n = vec4(idx, GridScale * 0.5) * HashScale1;
+
+	vec4 beta = floor(n * q_);
+	vec4 p = a * (n - beta * q) - beta * r;
+	
+	beta = (sign(-p)) * m_2 + m_2;
+	
+		//n = (p + beta);
+	
+
+	return floor( fract(dot((p + beta) * m_, vec4(1.0, -1.0, 1.0, -1.0))) * HashNum );
 }
 
 

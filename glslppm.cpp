@@ -408,6 +408,7 @@ void m_display(void)
 			glUniform4f(glGetUniformLocation(PSHash, "BufInfo"), HashResolution, HashResolution, 1.0f / float(HashResolution), 1.0f / float(HashResolution));
 			glUniform1i(glGetUniformLocation(PSHash, "HashNum"), HashResolution * HashResolution);
 			glUniform1f(glGetUniformLocation(PSHash, "GridScale"), GridScale);
+			glUniform1f(glGetUniformLocation(PSHash, "HashScale1"), 4194304.0f / GridScale);
 			glUniform3f(glGetUniformLocation(PSHash, "BBoxMin"), BBMin.x, BBMin.y, BBMin.z);
 			glUniform1i(glGetUniformLocation(PSHash, "PhotonPositionTexture"), 10); m_SetTexture(10, PhotonPositionTexture);
 			glUniform1i(glGetUniformLocation(PSHash, "PhotonFluxTexture"), 11); m_SetTexture(11, PhotonFluxTexture);
@@ -423,7 +424,7 @@ void m_display(void)
 
 				glUniform4f(glGetUniformLocation(PVSScatter, "BufInfo") , HashResolution, HashResolution, 1.0f / float(HashResolution), 1.0f / float(HashResolution));
 				glUniform1i(glGetUniformLocation(PVSScatter, "PhotonIndexTexture"), 8); m_SetTexture(8, PhotonIndexTexture);
-				glUniform1f(glGetUniformLocation(PVSScatter, "PhotonBufferSize"), PhotonBufferSize);
+				glUniform1f(glGetUniformLocation(PVSScatter, "PhotonBufferSize1"), 1.0f / float(PhotonBufferSize) );
 
 				glMatrixMode(GL_PROJECTION);
 					glLoadIdentity();
@@ -483,6 +484,7 @@ void m_display(void)
 			glUniform4f(glGetUniformLocation(PSProgressiveUpdate, "BufInfo"), HashResolution, HashResolution, 1.0f / float(HashResolution), 1.0f / float(HashResolution));
 			glUniform1f(glGetUniformLocation(PSProgressiveUpdate, "HashNum"), HashResolution * HashResolution);
 			glUniform1f(glGetUniformLocation(PSProgressiveUpdate, "GridScale"), GridScale);
+			glUniform1f(glGetUniformLocation(PSProgressiveUpdate, "HashScale1"), 4194304.0f / GridScale);
 			glUniform1f(glGetUniformLocation(PSProgressiveUpdate, "Alpha"), 0.7f);
 			glUniform3f(glGetUniformLocation(PSProgressiveUpdate, "BBoxMin"), BBMin.x, BBMin.y, BBMin.z);
 
@@ -672,7 +674,11 @@ int main(int argc, char *argv[])
 	// create shaders
 	PSDraw = m_CreateFragmentShader("draw.fs");
 	PSHash = m_CreateFragmentShader("hash.fs");
+	
+	//tigra: для всех фотонов проверить на видимость(или еще для чего-то QueryIntersection
 	PSProgressiveUpdate = m_CreateFragmentShader("progressive.fs");
+	
+	//tigra: для пикселов всех разделить flux на радиус с пи и т.д.
 	PSRadianceEstimate = m_CreateFragmentShader("re.fs");
 	PVSScatter = m_CreateFullShader("scatter.vs", "scatter.fs");
 	PVSCorrection = m_CreateFullShader("correction.vs", "correction.fs");
@@ -791,19 +797,22 @@ int main(int argc, char *argv[])
 	// initialize misc data
 	FrameCount = 0;
 	glClearColor(0.0, 0.0, 0.0, 0.0);
-
+	
 	CanonicalCameraPosition = TVector3(0.0f, 0.0f, 13.0f);
-	FieldOfView = 45.0f;
-	LookAtPosition = TVector3(0.0f, 0.0f, 0.0f);
-	gpurt.camera.Set(CanonicalCameraPosition, LookAtPosition, ImageResolution, ImageResolution, FieldOfView);
-
+	
 	// load mesh data
 	if(argc>1)
 	{		
 		gpurt.mesh.LoadOBJ(argv[1], TVector3(0.0f, 0.0f, 0.0f), 1);
+		CanonicalCameraPosition = TVector3(0.0f, 0.0f, 5.0f);
 	}
 	else
 	gpurt.mesh.LoadOBJ("cornell_metal.obj", TVector3(0.0f, 0.0f, 0.0f), 0.01f);
+
+	FieldOfView = 45.0f;
+	LookAtPosition = TVector3(0.0f, 0.0f, 0.0f);
+	gpurt.camera.Set(CanonicalCameraPosition, LookAtPosition, ImageResolution, ImageResolution, FieldOfView);
+
 
 	// precalcuation (BVH construction) for mesh
 	std::cerr << "building BVH...";

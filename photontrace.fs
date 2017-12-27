@@ -64,8 +64,19 @@ vec3 onb(const vec3 x, const vec3 n)
 	 
 	if (n.z < -0.9999999)
 	{
-		u = vec3(0.0, -1.0, 0.0); 
-		w = vec3(-1.0, 0.0, 0.0);
+		//u = vec3(0.0, -1.0, 0.0); 
+		//w = vec3(-1.0, 0.0, 0.0);
+		//return (x.x * u + x.y * v + x.z * w);
+		//x.x*(0,-1,0) + x.y*v + x.z*(-1,0,0)
+		//(0,-x.x,0) + x.y*v + (-x.z,0,0)
+		//x.y*v + (0,-x.x,0) + (-x.z,0,0)
+		//x.y*v - (x.z,x.x,0)
+		
+		//return x.y*v - vec3(x.z,x.x,0); //-2x3*  -6*
+		
+		u = vec3(x.z, x.x, 0.0);
+		
+		return x.y*v - u; //-2x3*  -6*
 	}
 	else
 	{
@@ -73,27 +84,33 @@ vec3 onb(const vec3 x, const vec3 n)
 		float b = -n.x * n.y * a;
 		u = vec3(1.0 - n.x * n.x * a, b, -n.x); 
 		w = vec3(b, 1.0 - n.y * n.y * a, -n.y);
+		return (x.x * u + x.y * v + x.z * w);
 	}
-	return (x.x * u + x.y * v + x.z * w);
 }
 
-
-float GPURnd(inout vec4 n)
-{
-	// Based on the post http://gpgpu.org/forums/viewtopic.php?t=2591&sid=17051481b9f78fb49fba5b98a5e0f1f3
-	// (The page no longer exists as of March 17th, 2015. Please let me know if you see why this code works.)
 	const vec4 q = vec4(   1225.0,    1585.0,    2457.0,    2098.0);
 	const vec4 r = vec4(   1112.0,     367.0,      92.0,     265.0);
 	const vec4 a = vec4(   3423.0,    2646.0,    1707.0,    1999.0);
 	const vec4 m = vec4(4194287.0, 4194277.0, 4194191.0, 4194167.0);
 
-	vec4 beta = floor(n / q);
+	const vec4 m_2 = vec4(0.5) * m;
+	const vec4 m_ = vec4(1) / m;
+	
+	const vec4 q_ = vec4(1) / q;
+
+
+float GPURnd(inout vec4 n)
+{	
+	vec4 beta = floor(n * q_);
 	vec4 p = a * (n - beta * q) - beta * r;
-	beta = (sign(-p) + vec4(1.0)) * vec4(0.5) * m;
+	
+	beta = (sign(-p)) * m_2 + m_2;
+	
 	n = (p + beta);
 
-	return fract(dot(n / m, vec4(1.0, -1.0, 1.0, -1.0)));
+	return fract(dot(n * m_, vec4(1.0, -1.0, 1.0, -1.0)));
 }
+
 
 
 void next(inout vec2 TriangleIndex, const float offset)
@@ -155,7 +172,8 @@ Intersection raytrace(const Ray ray)
 		vec3 V2 = texture2D(TexturePolygons, TriangleIndex).xyz; next(TriangleIndex, 1.0); 
 		float MaterialIndex = abs(texture2D(TexturePolygons, TriangleIndex).z) - 1.0;
 		//int BRDF = BRDFs[int(MaterialIndex)];
-		int BRDF =  int(texture2D(TextureMaterials, vec2((MaterialIndex + 0.5 + 0.25) * MaterialStride, 0.0)).x);
+		//int BRDF =  int(texture2D(TextureMaterials, vec2((MaterialIndex + 0.5 + 0.25) * MaterialStride, 0.0)).x);
+		int BRDF =  int(texture2D(TextureMaterials, vec2((MaterialIndex + 0.75) * MaterialStride, 0.0)).x);
 
 		// perform ray-triangle intersection if it is a leaf node
 		if ((BBoxMinTriangleX.w >= 0.0) && BBHit)
@@ -239,15 +257,18 @@ Intersection raytrace(const Ray ray)
 
 vec3 glossy_reflect(const vec3 d, const vec3 n, const float g, inout vec4 rndv)
 {
-	float a = 2.0 / (g + 1.0);
-	vec3 r = normalize((1.0 - a) * reflect(d, n) + a * n);
+	vec3 r = normalize((1.0 - g - g) * reflect(d, n) + (g + g) * n);
 
 	float rnd1 = GPURnd(rndv);
 	float rnd2 = GPURnd(rndv);
 
-	float temp1 = 2.0 * 3.141592 * rnd1;
-	float temp2 = sqrt(1.0 - pow(rnd2, 2.0 / (g + 1.0)));
-	vec3 v = vec3(sin(temp1) * temp2, pow(rnd2, 1.0 / (g + 1.0)), cos(temp1) * temp2);
+	//float temp1 = 2.0 * 3.141592 * rnd1;
+	float temp1 = 6.283184 * rnd1;
+	//float temp2 = sqrt(1.0 - pow(rnd2, 2.0 / (g + 1.0)));
+	
+	float temp2_ = pow(rnd2, g);
+	float temp2 = sqrt(1.0 - temp2_*temp2_);
+	vec3 v = vec3(sin(temp1) * temp2, temp2_, cos(temp1) * temp2);
 
 	vec3 result = normalize(onb(v, r));
 	if (dot(result, n) < 0.0)
@@ -261,18 +282,46 @@ vec3 glossy_reflect(const vec3 d, const vec3 n, const float g, inout vec4 rndv)
 
 void GenerateIBLSample(inout vec4 rndv, out vec3 flux, out vec3 dir, out vec3 org)
 {
-	float SceneProjectedArea = 4 * 3.141592 * SceneBSphere.w * SceneBSphere.w;
+	float SceneProjectedArea = 12.566368 * SceneBSphere.w * SceneBSphere.w;
 
+	/*
 	float temp1 = 2.0 * acos(sqrt(1.0 - GPURnd(rndv)));
-	float temp2 = 2.0 * 3.141592 * GPURnd(rndv);
+	
+	//float temp2 = 2.0 * 3.141592 * GPURnd(rndv);
+	float temp2 = 6.283184 * GPURnd(rndv);
 	dir.x = sin(temp1) * cos(temp2);
 	dir.y = cos(temp1);
 	dir.z = sin(temp1) * sin(temp2);
+	float temp1 = 2.0 * acos(sqrt(1.0 - GPURnd(rndv)));
+	*/
+	
+	//float temp1 = 2.0 * acos(sqrt(1.0 - GPURnd(rndv)));
+	float temp2 = 6.283184 * GPURnd(rndv);
+	
+	/*
+		cos(2*aaa) = 1 - 2*(sin(aaa)^2)
+		aaa = sqrt(1.0 - GPURnd(rndv))
+		sin(2*aaa) = 2*sin(aaa)*cos(aaa)
+		
+		sinA = sin(aaa)
+		cos(2*aaa) = 1 - (sinA+sinA)*sinA
+		sin(2*aaa) = (sinA+sinA)*cos(aaa)
+	*/
+	
+	float aaa = sqrt(1.0 - GPURnd(rndv));
+	
+	float sinA = sin(aaa);
+	float sinTemp1 = (sinA+sinA)*cos(aaa);
+	
+	dir.x = sinTemp1 * cos(temp2);
+	dir.y = 1 - (sinA+sinA)*sinA;
+	dir.z = sinTemp1 * sin(temp2);
 
 	if (GPURnd(rndv) > 0.5)
 	{
 		dir = vec3(1.0);
-		dir.y = 2.0 * dir.y;
+		//dir.y = 2.0 * dir.y;
+		dir.y += dir.y;
 		dir.z = -dir.z;
 		dir = normalize(dir);
 		flux = vec3(1.0, 1.0, 0.7) * SceneProjectedArea;
@@ -283,7 +332,9 @@ void GenerateIBLSample(inout vec4 rndv, out vec3 flux, out vec3 dir, out vec3 or
 	}
 
 	float radius = sqrt(GPURnd(rndv));
-	float theta = 2.0 * 3.141592 * GPURnd(rndv);
+	
+	//float theta = 2.0 * 3.141592 * GPURnd(rndv);
+	float theta = 6.283184 * GPURnd(rndv);
 	vec3 temp = vec3(radius * cos(theta), 0.0, radius * sin(theta));
 	org = onb(temp * SceneBSphere.w, dir) + dir * SceneBSphere.w + SceneBSphere.xyz;
 	dir = -dir;
@@ -330,8 +381,14 @@ void GenerateLightSourceSample(inout vec4 rndv, out vec3 flux, out vec3 dir, out
 	float rndv3 = s;
 
 	float a = 1.0 - t;
+	
+	/*
 	float b = (1.0 - s) * t;
 	float c = s * t;
+	*/
+	
+	float c = s * t;
+	float b = t - c;
 
 	// interpolate the position and the normal
 	vec2 TriangleIndex = LightIndex;
@@ -360,7 +417,8 @@ void GenerateLightSourceSample(inout vec4 rndv, out vec3 flux, out vec3 dir, out
 
 	if (abs(T.x) < 1e+10) 
 	{
-		flux *= texture3D(VolumeTextureTextures, vec3(T, MaterialNumRcp * (MaterialIndex + 0.5 + 0.25))).rgb;
+		//flux *= texture3D(VolumeTextureTextures, vec3(T, MaterialNumRcp * (MaterialIndex + 0.5 + 0.25))).rgb;
+		flux *= texture3D(VolumeTextureTextures, vec3(T, MaterialNumRcp * (MaterialIndex + 0.75))).rgb;
 	}
 
 	org = V0.xyz * a + V1.xyz * b + V2.xyz * c;
@@ -374,7 +432,9 @@ void GenerateLightSourceSample(inout vec4 rndv, out vec3 flux, out vec3 dir, out
 	vec2 rnd;
 	rnd.x = GPURnd(rndv);
 	rnd.y = GPURnd(rndv);
-	rnd.x = 2.0 * 3.141592 * rnd.x;
+	
+	//rnd.x = 2.0 * 3.141592 * rnd.x;
+	rnd.x = 6.283184 * rnd.x;
 	rnd.y = sqrt(rnd.y);
 	dir = onb(vec3(sin(rnd.x) * rnd.y, sqrt(1.0 - rnd.y * rnd.y), cos(rnd.x) * rnd.y), nrm);
 }
@@ -395,6 +455,7 @@ float Fresnel(in vec3 incom, in vec3 normal, in float index_internal, in float i
 		cos_theta2 = sqrt(cos_theta2);
 		float fresnel_rs = (index_internal * cos_theta1 - index_external * cos_theta2) / (index_internal * cos_theta1 + index_external * cos_theta2);
 		float fresnel_rp = (index_internal * cos_theta2 - index_external * cos_theta1) / (index_internal * cos_theta2 + index_external * cos_theta1);
+		
 		return (fresnel_rs * fresnel_rs + fresnel_rp * fresnel_rp) * 0.5;
 	}
 }
@@ -493,8 +554,10 @@ void main()
 		i.col = texture2D(TextureMaterials, vec2((MaterialIndex + 0.25) * MaterialStride, 0.0)).xyz;
 		//i.brdf = BRDFs[int(MaterialIndex + 0.25)];
 		i.brdf = int(texture2D(TextureMaterials, vec2((MaterialIndex + 0.5 + 0.25) * MaterialStride, 0.0)).x);
+		i.brdf = int(texture2D(TextureMaterials, vec2((MaterialIndex + 0.75) * MaterialStride, 0.0)).x);
 		i.eta = texture2D(TextureMaterials, vec2((MaterialIndex + 0.25) * MaterialStride, 0.0)).w; 
-		i.g = texture2D(TextureMaterials, vec2((MaterialIndex + 0.5 + 0.25) * MaterialStride, 0.0)).y; 
+		//i.g = texture2D(TextureMaterials, vec2((MaterialIndex + 0.5 + 0.25) * MaterialStride, 0.0)).y; 
+		i.g = texture2D(TextureMaterials, vec2((MaterialIndex + 0.75) * MaterialStride, 0.0)).y; 
 
 		if (abs(i.tex.x) < 1e+10) 
 		{
@@ -504,7 +567,8 @@ void main()
 		if (i.brdf == 0)
 		{
 			// matte
-			float r0 = 2.0 * 3.141592 * GPURnd(rndv);
+			//float r0 = 2.0 * 3.141592 * GPURnd(rndv);
+			float r0 = 6.283184 * GPURnd(rndv);
 			float r1 = sqrt(GPURnd(rndv));
 			vec3 v = vec3(sin(r0) * r1, sqrt(1.0 - r1 * r1), cos(r0) * r1);
 
@@ -516,14 +580,18 @@ void main()
 		{
 			// metal
 			r.org = i.pos + eps * i.gnrm;
-			if (i.brdf == 4) i.nrm = glossy_reflect(i.nrm, i.nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 4) i.nrm = glossy_reflect(i.nrm, i.nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 4) i.nrm = glossy_reflect(i.nrm, i.nrm, pow(2.0 / (1.0 - i.g), 2.71828), rndv);
+			if (i.brdf == 4) i.nrm = glossy_reflect(i.nrm, i.nrm, i.g, rndv);
 			r.dir = reflect(PhotonDirection.xyz, i.nrm);
 
 			if (dot(r.dir, i.gnrm) < 0.0) r.dir = -r.dir;
 		}
 		else if ((i.brdf == 2) || (i.brdf == 5))
 		{
-			if (i.brdf == 5) i.nrm = glossy_reflect(i.nrm, i.nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 5) i.nrm = glossy_reflect(i.nrm, i.nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 5) i.nrm = glossy_reflect(i.nrm, i.nrm, pow(2.0 / (1.0 - i.g), 2.71828), rndv);
+			if (i.brdf == 5) i.nrm = glossy_reflect(i.nrm, i.nrm, i.g, rndv);
 
 			// dielectric
 			float ln = dot(i.nrm, PhotonDirection.xyz);
@@ -570,7 +638,9 @@ void main()
 		}
 		else if ((i.brdf == 3) || (i.brdf == 6))
 		{
-			if (i.brdf == 6) i.nrm = glossy_reflect(i.nrm, i.nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 6) i.nrm = glossy_reflect(i.nrm, i.nrm, 1.0 / pow((1.0 - i.g) * 0.5, 2.71828), rndv);
+			//if (i.brdf == 6) i.nrm = glossy_reflect(i.nrm, i.nrm, pow(2.0 / (1.0 - i.g), 2.71828), rndv);
+			if (i.brdf == 6) i.nrm = glossy_reflect(i.nrm, i.nrm, i.g, rndv);
 
 			// plastic
 			float ln = -abs(dot(i.nrm, PhotonDirection.xyz));
@@ -587,7 +657,8 @@ void main()
 			else
 			{
 				// matte
-				float r0 = 2.0 * 3.141592 * GPURnd(rndv);
+				//float r0 = 2.0 * 3.141592 * GPURnd(rndv);
+				float r0 = 6.283184 * GPURnd(rndv);
 				float r1 = sqrt(GPURnd(rndv));
 				vec3 v = vec3(sin(r0) * r1, sqrt(1.0 - r1 * r1), cos(r0) * r1);
 

@@ -4,7 +4,7 @@
 uniform sampler2D PhotonIndexTexture;
 uniform vec4 BufInfo;
 
-uniform float PhotonBufferSize;
+uniform float PhotonBufferSize1;
 varying vec4 p;
 
 
@@ -16,8 +16,8 @@ void main()
 	vec2 PhotonListIndex = PhotonIndex.zw; 
 
 	// global 1d index in the photon buffer (i.e., photon id)
-	float z = (PhotonIndex.x / PhotonBufferSize) + PhotonIndex.y;
+	float z = (PhotonIndex.x * PhotonBufferSize1) + PhotonIndex.y;
 
-	gl_Position = vec4(PhotonListIndex * BufInfo.zw * 2.0 - vec2(1.0), z, 1.0);
+	gl_Position = vec4(PhotonListIndex * (BufInfo.zw + BufInfo.zw) - vec2(1.0), z, 1.0);
 	p = PhotonIndex;
 }

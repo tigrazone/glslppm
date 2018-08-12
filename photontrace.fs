@@ -522,7 +522,7 @@ void main()
 		vec4 Barycentric;
 		vec3 t0, t1, t2;
 
-		t0 = V1.xyz - V1.xyz;
+		t0 = V1.xyz - V0.xyz;
 		t1 = PhotonPosition.xyz - V0.xyz;
 		t2 = cross(t0, t1);
 		Barycentric.x = length(t2);
